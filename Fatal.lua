@@ -11,7 +11,10 @@ export type Window = {
 	Name: string,
 	Keybind: string | Enum.KeyCode,
 	Scale: UDim2,
-	Expire: string
+	Expire: string,
+	Folder: string | nil,
+	ConfigTab: boolean | nil,
+	Watermark: boolean | nil
 }
 
 export type Loader = {
@@ -1215,44 +1218,38 @@ function Fatality:NewInput(Frame : Frame , Callback : () -> ()) : TextButton
 	return Button;
 end;
 
-function Fatality:Drag(InputFrame: Frame, MoveFrame: Frame, Speed : number)
-	local dragToggle: boolean = false;
+function Fatality:Drag(InputFrame: Frame, MoveFrame: Frame, Speed : number, IgnoreBlacklist: boolean)
+	local dragging: boolean = false;
 	local dragStart: Vector3 = nil;
 	local startPos: UDim2 = nil;
 
-	local function updateInput(input)
-		local delta = input.Position - dragStart;
-		local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-			startPos.Y.Scale, startPos.Y.Offset + delta.Y);
-
-		Fatality:CreateAnimation(MoveFrame,Speed,nil,{
-			Position = position
-		});
-	end;
-
 	InputFrame.InputBegan:Connect(function(input)
-		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and #Fatality.DragBlacklist <= 0 then 
-			dragToggle = true
-			dragStart = input.Position
-			startPos = MoveFrame.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragToggle = false
-				end
-			end)
-		end
-	end)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and (IgnoreBlacklist or #Fatality.DragBlacklist <= 0) then
+			dragging = true;
+			dragStart = input.Position;
+			startPos = MoveFrame.Position;
+		end;
+	end);
 
 	UserInputService.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch and #Fatality.DragBlacklist <= 0 then
-			if dragToggle then
-				updateInput(input)
-			end
-		else
-			if #Fatality.DragBlacklist > 0 then
-				dragToggle = false
-			end
-		end
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart;
+			local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y);
+
+			if Speed and Speed > 0 then
+				Fatality:CreateAnimation(MoveFrame,Speed,nil,{
+					Position = position
+				});
+			else
+				MoveFrame.Position = position;
+			end;
+		end;
+	end);
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false;
+		end;
 	end);
 end;
 
@@ -2285,6 +2282,10 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 			end;
 
 			local selectedmem;
+
+			if not Multiplier then
+				Selected = nil;
+			end;
 
 			for i,v in next , Data do
 				local bth = new_button();
@@ -3551,6 +3552,150 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		return Respons;
 	end;
 
+	function elements:AddTextBox(Config)
+		Config = Config or {};
+		Config.Name = Config.Name or "Text Box";
+		Config.Default = Config.Default or "";
+		Config.Placeholder = Config.Placeholder or "Type here...";
+		Config.Callback = Config.Callback or function(text) end;
+		Config.Flag = Config.Flag or nil;
+
+		local TextBoxItem = Instance.new("Frame")
+		local TextBox_Name = Instance.new("TextLabel")
+		local ValueFrame = Instance.new("Frame")
+		local UICorner = Instance.new("UICorner")
+		local Input = Instance.new("TextBox")
+
+		if SearchAPI then
+			SearchAPI.Memory(Config.Name);
+		end;
+
+		TextBoxItem.Name = Fatality:RandomString()
+		TextBoxItem.Parent = Parent
+		TextBoxItem.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TextBoxItem.BackgroundTransparency = 1.000
+		TextBoxItem.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TextBoxItem.BorderSizePixel = 0
+		TextBoxItem.Size = UDim2.new(1, -25, 0, 17)
+		TextBoxItem.ZIndex = ZIndex + 1
+		Fatality:AddDragBlacklist(TextBoxItem);
+
+		TextBox_Name.Name = Fatality:RandomString()
+		TextBox_Name.Parent = TextBoxItem
+		TextBox_Name.AnchorPoint = Vector2.new(0, 0.5)
+		TextBox_Name.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TextBox_Name.BackgroundTransparency = 1.000
+		TextBox_Name.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TextBox_Name.BorderSizePixel = 0
+		TextBox_Name.Position = UDim2.new(0, 0, 0.5, 0)
+		TextBox_Name.Size = UDim2.new(1, 0, 0.800000012, 0)
+		TextBox_Name.ZIndex = ZIndex + 2
+		TextBox_Name.FontFace = Fatality.FontSemiBold
+		TextBox_Name.Text = Config.Name
+		TextBox_Name.TextColor3 = Color3.fromRGB(255, 255, 255)
+		TextBox_Name.TextSize = 13.000
+		TextBox_Name.TextTransparency = 0.200
+		TextBox_Name.TextXAlignment = Enum.TextXAlignment.Left
+
+		ValueFrame.Name = Fatality:RandomString()
+		ValueFrame.Parent = TextBoxItem
+		ValueFrame.AnchorPoint = Vector2.new(1, 0.5)
+		ValueFrame.BackgroundColor3 = Fatality.Colors.Black
+		ValueFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		ValueFrame.BorderSizePixel = 0
+		ValueFrame.ClipsDescendants = true
+		ValueFrame.Position = UDim2.new(1, -3, 0.5, 0)
+		ValueFrame.Size = UDim2.new(0, 100, 0.925000012, 0)
+		ValueFrame.ZIndex = ZIndex + 2
+
+		UICorner.CornerRadius = UDim.new(0, 2)
+		UICorner.Parent = ValueFrame
+
+		Input.Name = Fatality:RandomString()
+		Input.Parent = ValueFrame
+		Input.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		Input.BackgroundTransparency = 1.000
+		Input.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Input.BorderSizePixel = 0
+		Input.Position = UDim2.new(0, 4, 0, 0)
+		Input.Size = UDim2.new(1, -8, 1, 0)
+		Input.ZIndex = ZIndex + 3
+		Input.ClearTextOnFocus = false
+		Input.FontFace = Fatality.FontSemiBold
+		Input.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+		Input.PlaceholderText = Config.Placeholder
+		Input.Text = tostring(Config.Default)
+		Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+		Input.TextSize = 10.000
+		Input.TextTransparency = 0.300
+		Input.TextXAlignment = Enum.TextXAlignment.Left
+		Input.ClipsDescendants = true
+
+		local OpcToggle = function(value)
+			if value then
+				Fatality:CreateAnimation(TextBox_Name,0.45,{
+					TextTransparency = 0.2,
+				})
+
+				Fatality:CreateAnimation(ValueFrame,0.45,{
+					BackgroundTransparency = 0,
+				})
+
+				Fatality:CreateAnimation(Input,0.45,{
+					TextTransparency = 0.3,
+				})
+			else
+				Fatality:CreateAnimation(TextBox_Name,0.45,{
+					TextTransparency = 1,
+				})
+
+				Fatality:CreateAnimation(ValueFrame,0.45,{
+					BackgroundTransparency = 1,
+				})
+
+				Fatality:CreateAnimation(Input,0.45,{
+					TextTransparency = 1,
+				})
+			end;
+		end;
+
+		OpcToggle(Event:GetAttribute('V'));
+
+		Input.FocusLost:Connect(function()
+			Config.Default = Input.Text;
+			Config.Callback(Input.Text);
+		end);
+
+		local Respons = Fatality:CreateResponse({
+			Rename = function(new_name)
+				TextBox_Name.Text = new_name;
+			end,
+			GetValue = function()
+				return Input.Text;
+			end,
+			Signal = Event.Event:Connect(OpcToggle),
+			SetValue = function(v)
+				v = tostring(v or "");
+
+				local IsSame = v == Input.Text;
+
+				Input.Text = v;
+				Config.Default = v;
+
+				if not IsSame then
+					Config.Callback(v);
+				end;
+			end,
+			Flag = Config.Flag and (Config.Flag.."TextBox"),
+		});
+
+		if Config.Flag then
+			Fatality.WindowFlags[FatalWindow][Config.Flag.."TextBox"] = Respons;
+		end;
+
+		return Respons;
+	end;
+
 	return elements;
 end;
 
@@ -4155,6 +4300,15 @@ function Fatality.new(Window: Window)
 	Window.Scale = Window.Scale or UDim2.new(0, 750, 0, 500);
 	Window.Keybind = Window.Keybind or "Insert";
 	Window.Expire = Window.Expire or "never";
+	Window.Folder = Window.Folder or "Fatality";
+
+	if Window.ConfigTab == nil then
+		Window.ConfigTab = true;
+	end;
+
+	if Window.Watermark == nil then
+		Window.Watermark = true;
+	end;
 
 	local Fatal = {
 		Menus = {},
@@ -4631,7 +4785,10 @@ function Fatality.new(Window: Window)
 	UICorner_6.CornerRadius = UDim.new(0, 5)
 	UICorner_6.Parent = HeaderLineShadow_2
 
-	Fatality:Drag(FatalFrame,FatalFrame,0.1);
+	-- Drag: header and bottom bar always drag the window (even over elements), the free area too --
+	Fatality:Drag(Header,FatalFrame,0,true);
+	Fatality:Drag(Bottom,FatalFrame,0,true);
+	Fatality:Drag(FatalFrame,FatalFrame,0,false);
 
 	UserInputService.InputBegan:Connect(function(input,istyping)
 		if not istyping then
@@ -4645,6 +4802,7 @@ function Fatality.new(Window: Window)
 
 	function Fatal:SetUsername(name: string)
 		User_name.Text = name or Client.DisplayName;
+		Fatal.WatermarkNick = name;
 	end;
 
 	function Fatal:SetProfile(icon: string)
@@ -4752,6 +4910,9 @@ function Fatality.new(Window: Window)
 
 					Transparency = Transparency
 				};
+			elseif typeof(Value) == "EnumItem" then
+				ValueData.Type = "String";
+				ValueData.Value = Value.Name;
 			elseif typeof(Value) == "table" then
 				if Value.Color and Value.Transparency then
 					ValueData.Type = "Color3";
@@ -4805,6 +4966,7 @@ function Fatality.new(Window: Window)
 		MenuButton.BorderSizePixel = 0
 		MenuButton.Size = UDim2.new(0, 90, 0.85, 0)
 		MenuButton.ZIndex = 5
+		MenuButton.LayoutOrder = Menu.LayoutOrder or 0;
 
 		UICorner.CornerRadius = UDim.new(0, 3)
 		UICorner.Parent = MenuButton
@@ -5048,7 +5210,7 @@ function Fatality.new(Window: Window)
 			Bindable = BindEvent,
 		};
 
-		if not Fatal.MenuSelected then
+		if not Fatal.MenuSelected and not Menu.NoSelect then
 			Fatal.MenuSelected = _B;
 
 			ValueSelect(true);
@@ -5059,7 +5221,7 @@ function Fatality.new(Window: Window)
 		table.insert(Fatal.Menus,_B)
 
 		Fatality:CreateHover(MenuButton,function(bool)
-			if Fatal.MenuSelected.Root ~= MenuLiber then
+			if not Fatal.MenuSelected or Fatal.MenuSelected.Root ~= MenuLiber then
 				if bool then
 					Fatality:CreateAnimation(Icon,0.5,{
 						ImageTransparency = 0.2,
@@ -6351,6 +6513,509 @@ function Fatality.new(Window: Window)
 	function Fatal:SetVisible(b)
 		Fatal.Toggle = b;
 		ToggleUI(b);
+	end;
+
+	-- Watermark (draggable, click = open/close GUI) --
+	do
+		local Stats = game:GetService('Stats');
+		local WatermarkGui = Instance.new("ScreenGui")
+		local WFrame = Instance.new("Frame")
+		local WCorner = Instance.new("UICorner")
+		local WStroke = Instance.new("UIStroke")
+		local WLine = Instance.new("Frame")
+		local WPadding = Instance.new("UIPadding")
+		local WText = Instance.new("TextLabel")
+
+		WatermarkGui.Name = Fatality:RandomString()
+		WatermarkGui.Parent = CoreGui
+		WatermarkGui.ResetOnSpawn = false
+		WatermarkGui.IgnoreGuiInset = true
+		WatermarkGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+		WatermarkGui.Enabled = Window.Watermark
+		protect_gui(WatermarkGui);
+
+		WFrame.Name = Fatality:RandomString()
+		WFrame.Parent = WatermarkGui
+		WFrame.Active = true
+		WFrame.AutomaticSize = Enum.AutomaticSize.X
+		WFrame.BackgroundColor3 = Color3.fromRGB(19, 19, 19)
+		WFrame.BackgroundTransparency = 0.1
+		WFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		WFrame.BorderSizePixel = 0
+		WFrame.ClipsDescendants = true
+		WFrame.Position = UDim2.fromOffset(20, 60)
+		WFrame.Size = UDim2.new(0, 0, 0, 24)
+		WFrame.ZIndex = 5
+
+		WCorner.CornerRadius = UDim.new(0, 3)
+		WCorner.Parent = WFrame
+
+		WStroke.Color = Color3.fromRGB(29, 29, 29)
+		WStroke.Parent = WFrame
+
+		WPadding.PaddingLeft = UDim.new(0, 10)
+		WPadding.PaddingRight = UDim.new(0, 10)
+		WPadding.Parent = WFrame
+
+		WLine.Name = Fatality:RandomString()
+		WLine.Parent = WFrame
+		WLine.BackgroundColor3 = Fatality.Colors.Main
+		WLine.BorderSizePixel = 0
+		WLine.Position = UDim2.new(0, -10, 0, 0)
+		WLine.Size = UDim2.new(1, 20, 0, 2)
+		WLine.ZIndex = 6
+
+		WText.Name = Fatality:RandomString()
+		WText.Parent = WFrame
+		WText.AutomaticSize = Enum.AutomaticSize.X
+		WText.BackgroundTransparency = 1.000
+		WText.BorderSizePixel = 0
+		WText.Position = UDim2.new(0, 0, 0, 1)
+		WText.Size = UDim2.new(0, 0, 1, -1)
+		WText.ZIndex = 6
+		WText.FontFace = Fatality.FontSemiBold
+		WText.RichText = true
+		WText.Text = ""
+		WText.TextColor3 = Color3.fromRGB(255, 255, 255)
+		WText.TextSize = 13.000
+		WText.TextXAlignment = Enum.TextXAlignment.Center
+
+		Fatality:CreateHover(WFrame,function(bool)
+			if bool then
+				Fatality:CreateAnimation(WStroke,0.3,{
+					Color = Fatality.Colors.Main
+				})
+			else
+				Fatality:CreateAnimation(WStroke,0.3,{
+					Color = Color3.fromRGB(29, 29, 29)
+				})
+			end;
+		end);
+
+		-- drag + click --
+		local WDragging, WMoved = false, false;
+		local WDragStart, WStartPos;
+
+		WFrame.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				WDragging = true;
+				WMoved = false;
+				WDragStart = input.Position;
+				WStartPos = WFrame.Position;
+			end;
+		end);
+
+		UserInputService.InputChanged:Connect(function(input)
+			if WDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				local delta = input.Position - WDragStart;
+
+				if delta.Magnitude > 4 then
+					WMoved = true;
+				end;
+
+				if WMoved then
+					WFrame.Position = UDim2.new(WStartPos.X.Scale, WStartPos.X.Offset + delta.X, WStartPos.Y.Scale, WStartPos.Y.Offset + delta.Y);
+				end;
+			end;
+		end);
+
+		UserInputService.InputEnded:Connect(function(input)
+			if WDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+				WDragging = false;
+
+				if not WMoved then
+					Fatal.Toggle = not Fatal.Toggle;
+
+					ToggleUI(Fatal.Toggle);
+				end;
+			end;
+		end);
+
+		-- info (name | nick | ping | fps) --
+		local GetPing = function()
+			local ok, value = pcall(function()
+				return Stats.Network.ServerStatsItem["Data Ping"]:GetValue();
+			end);
+
+			if ok and typeof(value) == "number" then
+				return math.floor(value + 0.5);
+			end;
+
+			local ok2, ping = pcall(function()
+				return Client:GetNetworkPing() * 1000;
+			end);
+
+			if ok2 and typeof(ping) == "number" then
+				return math.floor(ping + 0.5);
+			end;
+
+			return 0;
+		end;
+
+		local Escape = function(text)
+			return (tostring(text):gsub("&","&amp;"):gsub("<","&lt;"):gsub(">","&gt;"));
+		end;
+
+		local Frames, LastTick = 0, tick();
+
+		RunService.RenderStepped:Connect(function()
+			Frames += 1;
+		end);
+
+		task.spawn(function()
+			local Sep = '  <font transparency="0.6">|</font>  ';
+			local Accent = "#" .. Fatality.Colors.Main:ToHex();
+
+			while WatermarkGui.Parent do
+				local now = tick();
+				local fps = math.floor((Frames / math.max(now - LastTick, 0.001)) + 0.5);
+
+				Frames = 0;
+				LastTick = now;
+
+				WText.Text = table.concat({
+					string.format('<font color="%s">%s</font>', Accent, Escape(Window.Name)),
+					Escape(Fatal.WatermarkNick or Client.DisplayName),
+					GetPing() .. " ms",
+					fps .. " fps",
+				}, Sep);
+
+				task.wait(0.5);
+			end;
+		end);
+
+		function Fatal:SetWatermark(state: boolean)
+			WatermarkGui.Enabled = state and true or false;
+		end;
+	end;
+
+	-- Config tab --
+	if Window.ConfigTab then
+		local HttpService = game:GetService('HttpService');
+		local BaseFolder = tostring(Window.Folder);
+		local SafeName = (tostring(Window.Name):gsub('[^%w_%-]','_'));
+		local ConfigDir = BaseFolder .. "/Config/" .. SafeName;
+		local AutoPath = BaseFolder .. "/Config/" .. SafeName .. "_autoload.json";
+
+		local FileSystem = (typeof(isfolder) == 'function' and typeof(makefolder) == 'function' and typeof(writefile) == 'function' and typeof(readfile) == 'function' and typeof(isfile) == 'function' and typeof(listfiles) == 'function' and typeof(delfile) == 'function');
+
+		local Notify = function(text)
+			Fatal.Notifier:Notify({
+				Title = "Config",
+				Content = text,
+				Icon = "settings",
+				Duration = 4,
+			});
+		end;
+
+		local EnsureDirs = function()
+			if not isfolder(BaseFolder) then
+				makefolder(BaseFolder);
+			end;
+
+			if not isfolder(BaseFolder .. "/Config") then
+				makefolder(BaseFolder .. "/Config");
+			end;
+
+			if not isfolder(ConfigDir) then
+				makefolder(ConfigDir);
+			end;
+		end;
+
+		local CleanName = function(text)
+			text = tostring(text or "");
+			text = text:gsub('[/\\:%*%?"<>|%c]','');
+			text = text:match("^%s*(.-)%s*$") or "";
+
+			return text:sub(1,40);
+		end;
+
+		local ListConfigs = function()
+			local out = {};
+
+			if FileSystem then
+				pcall(function()
+					EnsureDirs();
+
+					for i,path in next , listfiles(ConfigDir) do
+						local file = tostring(path):match("([^/\\]+)$");
+						local name = file and file:match("^(.+)%.json$");
+
+						if name then
+							table.insert(out,name);
+						end;
+					end;
+				end);
+			end;
+
+			table.sort(out);
+
+			return out;
+		end;
+
+		-- auto load state --
+		local AutoEnabled, AutoName = false, nil;
+
+		if FileSystem then
+			pcall(function()
+				if isfile(AutoPath) then
+					local data = HttpService:JSONDecode(readfile(AutoPath));
+
+					AutoEnabled = data.Enabled == true;
+					AutoName = (typeof(data.Config) == 'string' and data.Config) or nil;
+				end;
+			end);
+		end;
+
+		local WriteAuto = function()
+			if not FileSystem then return; end;
+
+			pcall(function()
+				EnsureDirs();
+				writefile(AutoPath,HttpService:JSONEncode({
+					Enabled = AutoEnabled,
+					Config = AutoName,
+				}));
+			end);
+		end;
+
+		local LoadConfigFile = function(name)
+			local path = ConfigDir .. "/" .. name .. ".json";
+
+			local ok = pcall(function()
+				if not isfile(path) then
+					error("missing config");
+				end;
+
+				Fatal:LoadConfig(HttpService:JSONDecode(readfile(path)));
+			end);
+
+			return ok;
+		end;
+
+		-- ui --
+		local Selected = nil;
+		local AutoToggle;
+		local ConfigList = ListConfigs();
+
+		local ConfigMenu = Fatal:AddMenu({
+			Name = "Config",
+			Icon = "settings",
+			AutoFill = false,
+			LayoutOrder = 9999,
+			NoSelect = true,
+		});
+
+		local Section = ConfigMenu:AddSection({
+			Name = "Config",
+			Position = "center",
+		});
+
+		local NameBox = Section:AddTextBox({
+			Name = "Config name",
+			Placeholder = "New config...",
+		});
+
+		local Dropdown = Section:AddDropdown({
+			Name = "Config list",
+			Values = ConfigList,
+			Default = (AutoName and table.find(ConfigList,AutoName)) and AutoName or nil,
+			Callback = function(value)
+				Selected = (typeof(value) == 'string' and value) or nil;
+			end,
+		});
+
+		local RefreshList = function(select)
+			Dropdown:SetValue(select);
+			Dropdown:SetData(ListConfigs());
+		end;
+
+		Section:AddButton({
+			Name = "Save config",
+			Callback = function()
+				if not FileSystem then
+					Notify("Executor has no file system support");
+					return;
+				end;
+
+				local target = CleanName(NameBox:GetValue());
+
+				if target == "" then
+					target = Selected;
+				end;
+
+				if not target or target == "" then
+					Notify("Type a config name or select a config");
+					return;
+				end;
+
+				local ok = pcall(function()
+					EnsureDirs();
+
+					local flags = Fatal:GetFlagConfig();
+
+					flags.Info = {
+						Name = Window.Name,
+						Folder = BaseFolder,
+						ConfigName = target,
+					};
+
+					writefile(ConfigDir .. "/" .. target .. ".json",HttpService:JSONEncode(flags));
+				end);
+
+				if ok then
+					NameBox:SetValue("");
+					RefreshList(target);
+					Notify("Saved config '" .. target .. "'");
+				else
+					Notify("Failed to save config");
+				end;
+			end,
+		});
+
+		Section:AddButton({
+			Name = "Load config",
+			Callback = function()
+				if not FileSystem then
+					Notify("Executor has no file system support");
+					return;
+				end;
+
+				if not Selected then
+					Notify("Select a config first");
+					return;
+				end;
+
+				if LoadConfigFile(Selected) then
+					Notify("Loaded config '" .. Selected .. "'");
+				else
+					Notify("Failed to load config");
+				end;
+			end,
+		});
+
+		Section:AddButton({
+			Name = "Delete config",
+			Risky = true,
+			Callback = function()
+				if not FileSystem then
+					Notify("Executor has no file system support");
+					return;
+				end;
+
+				local target = Selected;
+
+				if not target then
+					Notify("Select a config first");
+					return;
+				end;
+
+				pcall(function()
+					local path = ConfigDir .. "/" .. target .. ".json";
+
+					if isfile(path) then
+						delfile(path);
+					end;
+				end);
+
+				if AutoName == target then
+					AutoName = nil;
+					AutoEnabled = false;
+					WriteAuto();
+
+					if AutoToggle then
+						AutoToggle:SetValue(false);
+					end;
+				end;
+
+				RefreshList(nil);
+				Notify("Deleted config '" .. target .. "'");
+			end,
+		});
+
+		AutoToggle = Section:AddToggle({
+			Name = "Auto load config",
+			Default = (AutoEnabled and AutoName ~= nil) or false,
+			Callback = function(state)
+				if state then
+					if not FileSystem then
+						Notify("Executor has no file system support");
+
+						task.defer(function()
+							AutoToggle:SetValue(false);
+						end);
+
+						return;
+					end;
+
+					if not Selected then
+						Notify("Select a config first");
+
+						task.defer(function()
+							AutoToggle:SetValue(false);
+						end);
+
+						return;
+					end;
+
+					AutoName = Selected;
+					AutoEnabled = true;
+					WriteAuto();
+
+					Notify("Auto load: '" .. Selected .. "'");
+				else
+					AutoEnabled = false;
+					WriteAuto();
+				end;
+			end,
+		});
+
+		-- auto load (runs once, after the script finished creating its flagged elements) --
+		local AutoDone = false;
+
+		function Fatal:AutoLoadConfig()
+			if AutoDone then return; end;
+
+			AutoDone = true;
+
+			if FileSystem and AutoEnabled and AutoName then
+				if LoadConfigFile(AutoName) then
+					Notify("Auto loaded config '" .. AutoName .. "'");
+				else
+					Notify("Auto load failed for '" .. AutoName .. "'");
+				end;
+			end;
+		end;
+
+		if FileSystem and AutoEnabled and AutoName then
+			task.spawn(function()
+				local last, stable = -1, 0;
+
+				while not AutoDone do
+					task.wait(0.5);
+
+					local count = 0;
+
+					for _ in next , Fatality.WindowFlags[Fatalitywin] do
+						count += 1;
+					end;
+
+					if count > 0 and count == last then
+						stable += 1;
+					else
+						stable = 0;
+					end;
+
+					last = count;
+
+					if stable >= 3 then
+						Fatal:AutoLoadConfig();
+					end;
+				end;
+			end);
+		end;
+
+		Fatal.ConfigMenu = ConfigMenu;
 	end;
 
 	ToggleUI(true);
